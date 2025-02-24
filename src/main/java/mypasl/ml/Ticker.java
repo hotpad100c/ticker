@@ -54,7 +54,7 @@ public class Ticker implements ModInitializer {
 	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	private static final Map<String, Integer> WORLD_EVENT_MAP_BUILD = new HashMap<>(){};
+	/*private static final Map<String, Integer> WORLD_EVENT_MAP_BUILD = new HashMap<>(){};
 	private static final List<String> WORLD_EVENT_NAMES;
 	static {
 		WORLD_EVENT_NAMES = Arrays.stream(WorldEvents.class.getFields())
@@ -69,7 +69,7 @@ public class Ticker implements ModInitializer {
 					}
 				})
 				.collect(Collectors.toList());
-	}
+	}*/
 
 	// 解析事件名称 -> 事件数值
 	public static Integer getEventId(String eventName) {
@@ -77,7 +77,7 @@ public class Ticker implements ModInitializer {
 	}
 
 	private static final SuggestionProvider<ServerCommandSource> WORLD_EVENT_SUGGESTIONS =
-			(context, builder) -> CommandSource.suggestMatching(WORLD_EVENT_NAMES, builder);
+			(context, builder) -> CommandSource.suggestMatching(WORLD_EVENT_MAP.keySet(), builder);
 	@Override
 	public void onInitialize() {
 		// 注册指令
@@ -90,17 +90,19 @@ public class Ticker implements ModInitializer {
 		dispatcher.register(CommandManager.literal("scheduleTick")
 				.then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
 						.then(CommandManager.argument("block", BlockStateArgumentType.blockState(registryAccess))
-								.then(CommandManager.argument("time", IntegerArgumentType.integer(0)) // time 必须大于等于 0
-										.then(CommandManager.argument("priority", IntegerArgumentType.integer(-3, 3)) // priority 限制在 -3 到 3
+								.then(CommandManager.argument("time", IntegerArgumentType.integer(0))
+										.then(CommandManager.argument("priority", IntegerArgumentType.integer(-3, 3))
 												.executes(context -> {
 													ServerCommandSource source = context.getSource();
 
-													// 解析参数
 													BlockPos pos = BlockPosArgumentType.getBlockPos(context, "pos");
 													Block block = BlockStateArgumentType.getBlockState(context, "block").getBlockState().getBlock();
 													int time = IntegerArgumentType.getInteger(context, "time");
 													int priority = IntegerArgumentType.getInteger(context, "priority");
 													source.getWorld().scheduleBlockTick(pos, block,time, TickPriority.byIndex(priority));
+
+													source.sendFeedback(() -> Text.literal("ScheduleTick for [" + Text.translatable(block.getTranslationKey()).getString() + "] was added at [" + pos.getX() + "," +
+															pos.getY() + "," + pos.getZ() + "] with delay of [" + time + "]and priority[" + priority +"]."),true);
 
 													return Command.SINGLE_SUCCESS;
 												}))))));
@@ -116,7 +118,7 @@ public class Ticker implements ModInitializer {
 													Block block = BlockStateArgumentType.getBlockState(context, "block").getBlockState().getBlock();
 													int type = IntegerArgumentType.getInteger(context, "type");
 													int data = IntegerArgumentType.getInteger(context, "data");
-													addBlockEvent(source.getWorld(),pos, block, type, data);
+													addBlockEvent(source,pos, block, type, data);
 
 													return 1;
 												}))))));
@@ -196,16 +198,23 @@ public class Ticker implements ModInitializer {
 		);
 	}
 
-	public void addBlockEvent(ServerWorld world, BlockPos pos, Block block, int type, int data ){
-		world.addSyncedBlockEvent(pos, block, type, data);
+	public void addBlockEvent(ServerCommandSource source, BlockPos pos, Block block, int type, int data ){
+		source.getWorld().addSyncedBlockEvent(pos, block, type, data);
+		source.sendFeedback(() -> Text.literal("BlockEvent for [" + Text.translatable(block.getTranslationKey()).getString() + "] was emitted at [" + pos.getX() + "," +
+				pos.getY() + "," + pos.getZ() + "] with type [" + type + "] and data[" +data+"]."),true);
+
 	}
 	public int addGameEvent(ServerCommandSource source, Vec3d pos, String reason, @Nullable Entity entity, @Nullable BlockState blockState){
 		RegistryEntry<GameEvent> event = Registries.GAME_EVENT.getEntry(Identifier.of("minecraft:"+reason)).orElse(null);
 		if (event == null) {
-			source.sendError(Text.literal("未知的GameEvent: " + reason));
+			source.sendError(Text.literal("Unknown GameEvent: " + reason));
 			return 0;
 		}
 		source.getWorld().emitGameEvent(event, pos, new GameEvent.Emitter(entity, blockState));
+		source.sendFeedback(() -> Text.literal("GameEvent <" + reason + "> was emitted at [" + pos.getX() + "," + pos.getY() + "," + pos.getZ() + "]" +
+				(entity == null?" ":(" by entity <" + entity.getName() + ">")) + (blockState == null?" ":(" with block [" +
+				Text.translatable(blockState.getBlock().getTranslationKey()).getString()+ "]"))),true);
+
 		return 1;
 	}
 	public int addWorldEvent(ServerCommandSource source, BlockPos pos, String id, @Nullable PlayerEntity player, int data){
@@ -213,9 +222,11 @@ public class Ticker implements ModInitializer {
 		try {
 			eventId = getEventId(id);
 		} catch (Exception e) {
-			source.sendError(Text.literal("未知的WorldEvent: " + id));
+			source.sendError(Text.literal("Unknown WorldEvent: " + id));
 		}
 		source.getWorld().syncWorldEvent(player, eventId, pos, data);
+		source.sendFeedback(() -> Text.literal("WorldEvent <" + id + "> was emitted at [" + pos.getX() + "," + pos.getY() + "," + pos.getZ() +
+				"]　with data of　[" + data + "]　." + (player == null?" ":("But will not notify the player:" + player.getName() + "..."))),true);
 		return 1;
 	}
 }
