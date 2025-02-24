@@ -6,4 +6,4 @@
 
 /blockEvent (pos) (block) (type) (data)
 
-/worldEvent [(player)] <pos) (event) (data)
+/worldEvent [(player)] (pos) (event) (data)
