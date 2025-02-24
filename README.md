@@ -2,8 +2,8 @@
 
 /gameEvent (pos) (reason) [(entity)|(block)]
 0
-/scheduleTick (pos) <block) (time) (priority)
+/scheduleTick (pos) (block) (time) (priority)
 
-/blockEvent (pos) <block) (type) (data)
+/blockEvent (pos) (block) (type) (data)
 
 /worldEvent [(player)] <pos) (event) (data)
