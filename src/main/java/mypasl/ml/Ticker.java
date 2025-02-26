@@ -5,6 +5,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.sun.jdi.connect.Connector;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -12,6 +13,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.command.CommandSource;
@@ -48,12 +50,10 @@ import static mypasl.ml.WorldEventMapper.saveMapToFile;
 
 public class Ticker implements ModInitializer {
 	public static final String MOD_ID = "ticker";
-
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
 	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
 	/*private static final Map<String, Integer> WORLD_EVENT_MAP_BUILD = new HashMap<>(){};
 	private static final List<String> WORLD_EVENT_NAMES;
 	static {
@@ -75,7 +75,6 @@ public class Ticker implements ModInitializer {
 	public static Integer getEventId(String eventName) {
 		return WORLD_EVENT_MAP.get(eventName);
 	}
-
 	private static final SuggestionProvider<ServerCommandSource> WORLD_EVENT_SUGGESTIONS =
 			(context, builder) -> CommandSource.suggestMatching(WORLD_EVENT_MAP.keySet(), builder);
 	@Override
@@ -224,9 +223,18 @@ public class Ticker implements ModInitializer {
 		} catch (Exception e) {
 			source.sendError(Text.literal("Unknown WorldEvent: " + id));
 		}
-		source.getWorld().syncWorldEvent(player, eventId, pos, data);
-		source.sendFeedback(() -> Text.literal("WorldEvent <" + id + "> was emitted at [" + pos.getX() + "," + pos.getY() + "," + pos.getZ() +
-				"]　with data of　[" + data + "]　." + (player == null?" ":("But will not notify the player:" + player.getName() + "..."))),true);
+		boolean global = eventId == 1023 || eventId == 1028 || eventId == 1038;
+		if(global){
+			source.getWorld().syncGlobalEvent(eventId, pos, data);
+			source.sendFeedback(() -> Text.literal("<GLOBAL>WorldEvent <" + id + "> was emitted at [" + pos.getX() + "," + pos.getY() + "," + pos.getZ() +
+					"]　with data of　[" + data + "]　." + (player == null?" ":("But will not notify the player:" + player.getName() + "..."))),true);
+
+		}else {
+			source.getWorld().syncWorldEvent(player, eventId, pos, data);
+			source.sendFeedback(() -> Text.literal("WorldEvent <" + id + "> was emitted at [" + pos.getX() + "," + pos.getY() + "," + pos.getZ() +
+					"]　with data of　[" + data + "]　." + (player == null?" ":("But will not notify the player:" + player.getName() + "..."))),true);
+
+		}
 		return 1;
 	}
 }
